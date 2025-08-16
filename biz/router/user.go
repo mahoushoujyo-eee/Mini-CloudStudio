@@ -13,8 +13,8 @@ func RegisterUser(r *route.RouterGroup) {
 	{
 		publicRouter.POST("/login", middleware.JwtMiddleware.LoginHandler)
 		publicRouter.POST("/register", handler.UserRegister)
-		publicRouter.POST("/reset/email")
-		publicRouter.POST("/reset/password")
+		publicRouter.POST("/reset/email", handler.UserResetCode)
+		publicRouter.POST("/reset/password", handler.UserResetPassword)
 	}
 
 	commonRouter := r.Group("/common", middleware.JwtMiddleware.MiddlewareFunc())

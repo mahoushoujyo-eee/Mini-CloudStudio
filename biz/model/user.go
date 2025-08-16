@@ -19,11 +19,14 @@ type UserParam struct {
 	Password string `json:"password"`
 	Email    string `json:"email"`
 	Nickname string `json:"nickname"`
+	Code     string `json:"code"`
 }
 
 type EmailParam struct {
 	Receiver string `json:"receiver"`
 	Type     string `json:"type"`
+	Password string `json:"password"`
+	Code     string `json:"code"`
 }
 
 type Response struct {

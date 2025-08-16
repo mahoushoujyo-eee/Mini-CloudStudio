@@ -47,3 +47,57 @@ func UserHello(ctx context.Context, c *app.RequestContext) {
 		Message:    "Hello " + name,
 	})
 }
+
+func UserResetCode(ctx context.Context, c *app.RequestContext) {
+	var err error
+	var emailParam model.EmailParam
+
+	err = c.BindAndValidate(&emailParam)
+	if err != nil {
+		c.JSON(consts.StatusOK, model.Response{
+			StatusCode: consts.StatusInternalServerError,
+			Message:    err.Error(),
+		})
+		return
+	}
+
+	err = service.NewUserService(ctx, c).SendEmail(emailParam)
+	if err != nil {
+		c.JSON(consts.StatusOK, model.Response{
+			StatusCode: consts.StatusInternalServerError,
+			Message:    err.Error(),
+		})
+		return
+	}
+	c.JSON(consts.StatusOK, model.Response{
+		StatusCode: consts.StatusOK,
+		Message:    "Success",
+	})
+}
+
+func UserResetPassword(ctx context.Context, c *app.RequestContext) {
+	var err error
+	var emailParam model.EmailParam
+
+	err = c.BindAndValidate(&emailParam)
+	if err != nil {
+		c.JSON(consts.StatusOK, model.Response{
+			StatusCode: consts.StatusInternalServerError,
+			Message:    err.Error(),
+		})
+		return
+	}
+
+	err = service.NewUserService(ctx, c).ResetPassword(emailParam)
+	if err != nil {
+		c.JSON(consts.StatusOK, model.Response{
+			StatusCode: consts.StatusInternalServerError,
+			Message:    err.Error(),
+		})
+		return
+	}
+	c.JSON(consts.StatusOK, model.Response{
+		StatusCode: consts.StatusOK,
+		Message:    "Success",
+	})
+}

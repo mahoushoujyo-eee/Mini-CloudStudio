@@ -13,6 +13,7 @@ import (
 func Init() {
 	middleware.InitJwt()
 	db := config.InitDB()
+	config.InitRedis()
 	config.InitEmailClient()
 	db.AutoMigrate(
 		&model.User{},
