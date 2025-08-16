@@ -14,4 +14,9 @@ func GeneratedRegister(r *server.Hertz) {
 	{
 		RegisterUser(userRouter)
 	}
+
+	cloudDevRouter := r.Group("/app")
+	{
+		RegisterCloudDev(cloudDevRouter)
+	}
 }
