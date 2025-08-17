@@ -6,6 +6,8 @@ import (
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/protocol/consts"
 
+	corev1 "k8s.io/api/core/v1"
+
 	"learn/biz/model"
 	"learn/biz/service"
 )
@@ -22,7 +24,7 @@ func AppCreate(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	err = service.NewAppService(ctx, c).CreateApp(&appParam)
+	podName, err := service.NewAppService(ctx, c).CreateApp(&appParam)
 	if err != nil {
 		c.JSON(consts.StatusOK, model.Response{
 			StatusCode: consts.StatusInternalServerError,
@@ -34,6 +36,41 @@ func AppCreate(ctx context.Context, c *app.RequestContext) {
 	c.JSON(consts.StatusOK, model.Response{
 		StatusCode: consts.StatusOK,
 		Message:    "ok",
+		Data:       podName,
+	})
+}
+
+func AppGetPodInfo(ctx context.Context, c *app.RequestContext) {
+	var kbParam model.KubernetesParam
+
+	err := c.BindAndValidate(&kbParam)
+	if err != nil {
+		c.JSON(consts.StatusOK, model.Response{
+			StatusCode: consts.StatusInternalServerError,
+			Message:    err.Error(),
+		})
+		return
+	}
+
+	podInfo, err := service.NewAppService(ctx, c).GetStateOfApp(&kbParam)
+	if err != nil {
+		c.JSON(consts.StatusOK, model.Response{
+			StatusCode: consts.StatusInternalServerError,
+			Message:    err.Error(),
+		})
+		return
+	}
+
+	c.JSON(consts.StatusOK, model.Response{
+		StatusCode: consts.StatusOK,
+		Message:    "ok",
+		Data: struct {
+			Phase      corev1.PodPhase       `json:"phase"`
+			Conditions []corev1.PodCondition `json:"conditions"`
+		}{
+			Phase:      podInfo.Phase,
+			Conditions: podInfo.Conditions,
+		},
 	})
 }
 
@@ -62,6 +99,34 @@ func AppList(ctx context.Context, c *app.RequestContext) {
 		StatusCode: consts.StatusOK,
 		Message:    "查询成功",
 		Data:       applications,
+	})
+
+}
+
+func AppDelete(ctx context.Context, c *app.RequestContext) {
+	var appParam model.AppParam
+
+	err := c.BindAndValidate(&appParam)
+	if err != nil {
+		c.JSON(consts.StatusOK, model.Response{
+			StatusCode: consts.StatusInternalServerError,
+			Message:    err.Error(),
+		})
+		return
+	}
+
+	err = service.NewAppService(ctx, c).DeleteApp(&appParam)
+	if err != nil {
+		c.JSON(consts.StatusOK, model.Response{
+			StatusCode: consts.StatusInternalServerError,
+			Message:    err.Error(),
+		})
+		return
+	}
+
+	c.JSON(consts.StatusOK, model.Response{
+		StatusCode: consts.StatusOK,
+		Message:    "删除成功",
 	})
 
 }

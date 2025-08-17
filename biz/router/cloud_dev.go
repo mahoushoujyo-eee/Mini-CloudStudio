@@ -17,10 +17,10 @@ func RegisterCloudDev(r *route.RouterGroup) {
 	commonRouter := r.Group("/common", middleware.JwtMiddleware.MiddlewareFunc())
 	{
 		commonRouter.GET("/hello", handler.UserHello)
-		commonRouter.GET("/details")
+		commonRouter.POST("/details", handler.AppGetPodInfo)
 		commonRouter.GET("/list", handler.AppList)
 		commonRouter.POST("/create", handler.AppCreate)
-		commonRouter.POST("/delete")
+		commonRouter.POST("/delete", handler.AppDelete)
 		commonRouter.POST("/update")
 	}
 

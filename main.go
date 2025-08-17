@@ -5,7 +5,6 @@ package main
 import (
 	"learn/biz/config"
 	"learn/biz/middleware"
-	"learn/biz/model"
 
 	"github.com/cloudwego/hertz/pkg/app/server"
 )
@@ -15,12 +14,7 @@ func Init() {
 	config.InitRedis()
 	config.InitEmailClient()
 	config.InitKubernetesClient()
-	db := config.InitDB()
-	db.AutoMigrate(
-		&model.User{},
-		&model.Role{},
-		&model.Application{},
-	)
+	config.InitDB()
 }
 
 func main() {

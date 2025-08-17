@@ -3,6 +3,7 @@ package util
 import (
 	"context"
 	"fmt"
+	"log"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -22,8 +23,39 @@ func NewKubernetesUtil(ctx context.Context) *KubernetesUtil {
 	return &KubernetesUtil{ctx: ctx}
 }
 
-func (s *KubernetesUtil) GetPods(param model.KubernetesParam) {
-	// 获取 default namespace 下的所有 Pod
+func (s *KubernetesUtil) EnsureNamespace(namespace string) error {
+	// 先检查命名空间是否存在
+	_, err := config.KubernetesClient.CoreV1().Namespaces().Get(s.ctx, namespace, metav1.GetOptions{})
+	if err != nil {
+		if errors.IsNotFound(err) {
+			// 命名空间不存在，创建它
+			ns := &corev1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: namespace,
+					Labels: map[string]string{
+						"created-by": "hertz",
+						"purpose":    "code-server",
+					},
+				},
+			}
+
+			_, createErr := config.KubernetesClient.CoreV1().Namespaces().Create(s.ctx, ns, metav1.CreateOptions{})
+			if createErr != nil && !errors.IsAlreadyExists(createErr) {
+				return fmt.Errorf("创建命名空间失败: %w", createErr)
+			}
+
+			fmt.Printf("命名空间 %s 创建成功\n", namespace)
+			return nil
+		}
+		return fmt.Errorf("检查命名空间失败: %w", err)
+	}
+
+	fmt.Printf("命名空间 %s 已存在\n", namespace)
+	return nil
+}
+
+func (s *KubernetesUtil) GetPodList(param model.KubernetesParam) {
+	// 获取 namespace 下的所有 Pod
 	pods, err := config.KubernetesClient.CoreV1().Pods(param.Namespace).List(s.ctx, metav1.ListOptions{})
 	if err != nil {
 		panic(err)
@@ -48,7 +80,7 @@ func (s *KubernetesUtil) CreatePod(kbParam *model.KubernetesParam, appParam *mod
 		Spec: corev1.PodSpec{
 			Containers: []corev1.Container{{
 				Name:  "code-server",
-				Image: "linuxserver/code-server:4.103.0",
+				Image: "docker.1ms.run/linuxserver/code-server:4.103.0",
 				Env: []corev1.EnvVar{
 					{Name: "PUID", Value: "1000"},
 					{Name: "PGID", Value: "1000"},
@@ -114,14 +146,11 @@ func (s *KubernetesUtil) CreatePvc(kbParam *model.KubernetesParam, appParam *mod
 		},
 	}
 	if _, err := config.KubernetesClient.CoreV1().PersistentVolumeClaims(kbParam.Namespace).Create(s.ctx, pvc, metav1.CreateOptions{}); err != nil && !errors.IsAlreadyExists(err) {
+		log.Printf("创建 PVC 失败: %w", err)
 		return fmt.Errorf("创建 PVC 失败: %w", err)
 	}
 
 	return nil
-}
-
-func PodForward() {
-
 }
 
 func (s *KubernetesUtil) CreateSvc(kbParam *model.KubernetesParam, appParam *model.AppParam) error {
@@ -157,12 +186,40 @@ func (s *KubernetesUtil) CreateSvc(kbParam *model.KubernetesParam, appParam *mod
 		Services(kbParam.Namespace).
 		Create(s.ctx, svc, metav1.CreateOptions{})
 	if err != nil {
+		log.Printf("创建 Service 失败: %w", err)
 		return err
 	}
 
-	fmt.Printf("Service %q created, clusterIP=%s\n", result.GetName(), result.Spec.ClusterIP)
+	log.Printf("Service %q created, clusterIP=%s\n", result.GetName(), result.Spec.ClusterIP)
 
 	return nil
+}
+
+func (s *KubernetesUtil) DeletePodSvcPvc(kbParam *model.KubernetesParam) error {
+	if err := config.KubernetesClient.CoreV1().Pods(kbParam.Namespace).Delete(s.ctx, kbParam.Pod, metav1.DeleteOptions{}); err != nil {
+		log.Printf("删除 Pod 失败: %v", err)
+		return fmt.Errorf("删除 Pod 失败: %w", err)
+	}
+
+	if err := config.KubernetesClient.CoreV1().Services(kbParam.Namespace).Delete(s.ctx, kbParam.Svc, metav1.DeleteOptions{}); err != nil {
+		log.Printf("删除 Service 失败: %v", err)
+		return fmt.Errorf("删除 Service 失败: %w", err)
+	}
+
+	if err := config.KubernetesClient.CoreV1().PersistentVolumeClaims(kbParam.Namespace).Delete(s.ctx, kbParam.Pvc, metav1.DeleteOptions{}); err != nil {
+		log.Printf("删除 PVC 失败: %v", err)
+		return fmt.Errorf("删除 PVC 失败: %w", err)
+	}
+
+	return nil
+}
+
+func (s *KubernetesUtil) GetPodInfo(kbParam *model.KubernetesParam) (*corev1.Pod, error) {
+	pod, err := config.KubernetesClient.CoreV1().Pods(kbParam.Namespace).Get(s.ctx, kbParam.Pod, metav1.GetOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("获取Pod信息失败: %w", err)
+	}
+	return pod, nil
 }
 
 func CreateHttpRoute() {

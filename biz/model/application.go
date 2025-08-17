@@ -6,7 +6,7 @@ import (
 
 type Application struct {
 	gorm.Model
-	Name   string `gorm:"varchar(100); not null; unique" json:"name"`
+	Name   string `gorm:"varchar(100); not null;" json:"name"`
 	State  string `gorm:"varchar(20)" json:"state"`
 	UserId uint   `gorm:"not null;" json:"user_id"`
 	Cpu    string `gorm:"not null;" json:"cpu"`

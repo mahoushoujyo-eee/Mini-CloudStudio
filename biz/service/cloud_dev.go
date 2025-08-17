@@ -4,9 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/google/uuid"
+	corev1 "k8s.io/api/core/v1"
 
 	"learn/biz/config"
 	"learn/biz/model"
@@ -41,17 +43,17 @@ func (s *AppService) ListPods() ([]*model.Application, error) {
 	return applications, nil
 }
 
-func (s *AppService) CreateApp(appParam *model.AppParam) error {
+func (s *AppService) CreateApp(appParam *model.AppParam) (string, error) {
 
 	userId, ok := s.c.Get("user_id")
 
 	if !ok {
-		return errors.New("没有找到用户ID")
+		return "", errors.New("没有找到用户ID")
 	}
 
 	application := &model.Application{
 		Name:   appParam.Name,
-		UserId: userId.(uint),
+		UserId: uint(userId.(int64)),
 		Cpu:    appParam.Cpu,
 		Memory: appParam.Memory,
 		State:  "initializing",
@@ -60,12 +62,20 @@ func (s *AppService) CreateApp(appParam *model.AppParam) error {
 	laterfix := uuid.NewString()[:8]
 
 	kbParam := &model.KubernetesParam{
-		Namespace: fmt.Sprintf("ns-%d", userId.(uint)),
+		Namespace: fmt.Sprintf("ns-%d", userId.(int64)),
 		Pod:       fmt.Sprintf("pod-%s", laterfix),
 		Svc:       fmt.Sprintf("svc-%s", laterfix),
 		Pvc:       fmt.Sprintf("pvc-%s", laterfix),
 		State:     "initializing",
 	}
+
+	// 确保命名空间存在
+	if err := util.NewKubernetesUtil(s.ctx).EnsureNamespace(kbParam.Namespace); err != nil {
+		log.Printf("创建命名空间失败: %v", err)
+		return "", err
+	}
+
+	log.Printf("开始提交创建请求")
 
 	go func() {
 		util.NewKubernetesUtil(s.ctx).CreatePvc(kbParam, appParam)
@@ -75,17 +85,55 @@ func (s *AppService) CreateApp(appParam *model.AppParam) error {
 
 	err := config.DB.WithContext(s.ctx).Create(application).Error
 	if err != nil {
-		return err
+		return "", err
 	}
 
-	return nil
+	return kbParam.Pod, nil
+}
+
+func (s *AppService) GetStateOfApp(kbParam *model.KubernetesParam) (*corev1.PodStatus, error) {
+	userId, ok := s.c.Get("user_id")
+
+	if !ok {
+		return nil, errors.New("没有找到用户ID")
+	}
+
+	kbParam.Namespace = fmt.Sprintf("ns-%d", userId.(int64))
+
+	podInfo, err := util.NewKubernetesUtil(s.ctx).GetPodInfo(kbParam)
+	if err != nil {
+		log.Println(err.Error())
+		return nil, err
+	}
+	return &podInfo.Status, nil
 }
 
 func (s *AppService) DeleteApp(appParam *model.AppParam) error {
-	return nil
-}
+	userId, ok := s.c.Get("user_id")
 
-func (s *AppService) GetStateOfApp(appParam *model.AppParam) error {
+	if !ok {
+		return errors.New("没有找到用户ID")
+	}
+
+	var laterfix string
+	if len(appParam.Name) >= 8 {
+		laterfix = appParam.Name[len(appParam.Name)-8:]
+	} else {
+		return errors.New("应用名称错误！")
+	}
+
+	kbParam := &model.KubernetesParam{
+		Namespace: fmt.Sprintf("ns-%d", userId.(int64)),
+		Pod:       fmt.Sprintf("pod-%s", laterfix),
+		Svc:       fmt.Sprintf("svc-%s", laterfix),
+		Pvc:       fmt.Sprintf("pvc-%s", laterfix),
+	}
+
+	err := util.NewKubernetesUtil(s.ctx).DeletePodSvcPvc(kbParam)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
