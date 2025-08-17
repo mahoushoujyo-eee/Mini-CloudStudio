@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/google/uuid"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -24,7 +25,7 @@ func NewKubernetesUtil(ctx context.Context) *KubernetesUtil {
 
 func (s *KubernetesUtil) GetPods(param model.KubernetesParam) {
 	// 获取 default namespace 下的所有 Pod
-	pods, err := config.KubernetesClient.CoreV1().Pods("default").List(context.TODO(), metav1.ListOptions{})
+	pods, err := config.KubernetesClient.CoreV1().Pods(param.Namespace).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		panic(err)
 	}
@@ -35,124 +36,103 @@ func (s *KubernetesUtil) GetPods(param model.KubernetesParam) {
 	}
 }
 
-func (s *KubernetesUtil) CreatePods(param model.KubernetesParam) {
-	// 3. 定义 Pod 对象
-	// 3. 定义 Pod
+func (s *KubernetesUtil) CreateCodeServerPod(kbParam *model.KubernetesParam, appParam *model.AppParam) error {
+	// 3. 创建 Pod
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "code-server",
-			Namespace: "default", // 可改为其他命名空间
+			Name:      kbParam.Pod,
+			Namespace: kbParam.Namespace,
 			Labels: map[string]string{
 				"app": "code-server",
 			},
 		},
 		Spec: corev1.PodSpec{
-			Containers: []corev1.Container{
-				{
-					Name:  "code-server",
-					Image: "linuxserver/code-server:4.103.0",
-					Env: []corev1.EnvVar{
-						{Name: "PUID", Value: "1000"},
-						{Name: "PGID", Value: "1000"},
-						{Name: "TZ", Value: "Etc/UTC"},
-						{Name: "PASSWORD", Value: "yuzaoqian123"},
-						{Name: "SUDO_PASSWORD", Value: "root"},
-						// {Name: "PROXY_DOMAIN", Value: "code-server.my.domain"},
-						// {Name: "DEFAULT_WORKSPACE", Value: "/config/workspace"},
-						{Name: "PWA_APPNAME", Value: "code-server"},
+			Containers: []corev1.Container{{
+				Name:  "code-server",
+				Image: "linuxserver/code-server:4.103.0",
+				Env: []corev1.EnvVar{
+					{Name: "PUID", Value: "1000"},
+					{Name: "PGID", Value: "1000"},
+					{Name: "TZ", Value: "Etc/UTC"},
+					{Name: "PASSWORD", Value: "password"}, // 让前端传
+					{Name: "SUDO_PASSWORD", Value: "root"},
+					{Name: "PWA_APPNAME", Value: "code-server"},
+				},
+				Ports: []corev1.ContainerPort{{
+					ContainerPort: 8443,
+					Protocol:      corev1.ProtocolTCP,
+					Name:          "https",
+				}},
+				VolumeMounts: []corev1.VolumeMount{{
+					Name:      "data",
+					MountPath: "/config",
+				}},
+				Resources: corev1.ResourceRequirements{
+					Requests: corev1.ResourceList{
+						corev1.ResourceCPU:    resource.MustParse(appParam.Cpu),
+						corev1.ResourceMemory: resource.MustParse(appParam.Memory),
 					},
-					Ports: []corev1.ContainerPort{
-						{ContainerPort: 8443, Protocol: "TCP", Name: "http"},
-					},
-					VolumeMounts: []corev1.VolumeMount{
-						{
-							Name:      "config-volume",
-							MountPath: "/config",
-						},
-					},
-					Resources: corev1.ResourceRequirements{
-						Requests: corev1.ResourceList{
-							corev1.ResourceCPU:    resource.MustParse("500m"),
-							corev1.ResourceMemory: resource.MustParse("1024Mi"),
-						},
-						Limits: corev1.ResourceList{
-							corev1.ResourceCPU:    resource.MustParse("1000m"),
-							corev1.ResourceMemory: resource.MustParse("2048Mi"),
-						},
+					Limits: corev1.ResourceList{
+						corev1.ResourceCPU:    resource.MustParse(appParam.Cpu),
+						corev1.ResourceMemory: resource.MustParse(appParam.Memory),
 					},
 				},
-			},
-			Volumes: []corev1.Volume{
-				{
-					Name: "config-volume",
-					VolumeSource: corev1.VolumeSource{
-						PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-							ClaimName: "code-server-pvc",
-						},
+			}},
+			Volumes: []corev1.Volume{{
+				Name: "data",
+				VolumeSource: corev1.VolumeSource{
+					PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+						ClaimName: kbParam.Pvc,
 					},
 				},
-			},
-			RestartPolicy: corev1.RestartPolicyAlways, // 等价于 --restart unless-stopped
+			}},
+			RestartPolicy: corev1.RestartPolicyAlways,
 		},
 	}
 
-	// 4. 调用 API 创建 Pod
-	_, err := config.KubernetesClient.CoreV1().Pods("default").Create(
-		context.TODO(),
-		pod,
-		metav1.CreateOptions{},
-	)
-	if err != nil {
-		// 判断是否已存在
-		if errors.IsAlreadyExists(err) {
-			fmt.Println("Pod 已存在")
-		} else {
-			panic(err)
-		}
-	} else {
-		fmt.Println("Pod 创建成功")
+	_, err := config.KubernetesClient.CoreV1().Pods(kbParam.Namespace).Create(s.ctx, pod, metav1.CreateOptions{})
+	if errors.IsAlreadyExists(err) {
+		return nil // 已存在算成功
 	}
+	return err
 }
 
-func (s *KubernetesUtil) CreatePvc(param model.KubernetesParam) {
+func (s *KubernetesUtil) CreatePvc(kbParam *model.KubernetesParam, appParam *model.AppParam) error {
+	// 2. 创建 PVC（如已存在则忽略）
+	pvcName := fmt.Sprintf("code-server-%s", uuid.NewString()[:8])
 	pvc := &corev1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "code-server-pvc",
-			Namespace: "default",
+			Name:      pvcName,
+			Namespace: kbParam.Namespace,
 		},
 		Spec: corev1.PersistentVolumeClaimSpec{
-			AccessModes: []corev1.PersistentVolumeAccessMode{
-				corev1.ReadWriteOnce,
-			},
+			AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
 			Resources: corev1.VolumeResourceRequirements{
 				Requests: corev1.ResourceList{
 					corev1.ResourceStorage: resource.MustParse("5Gi"),
 				},
 			},
+			// 不写 StorageClassName 就走默认 openebs-hostpath
 		},
 	}
-
-	// 4. 调用 API 创建
-	created, err := config.KubernetesClient.CoreV1().
-		PersistentVolumeClaims("default").
-		Create(context.TODO(), pvc, metav1.CreateOptions{})
-	if err != nil {
-		panic(err)
+	if _, err := config.KubernetesClient.CoreV1().PersistentVolumeClaims(kbParam.Namespace).Create(s.ctx, pvc, metav1.CreateOptions{}); err != nil && !errors.IsAlreadyExists(err) {
+		return fmt.Errorf("创建 PVC 失败: %w", err)
 	}
+	kbParam.Pvc = pvcName
 
-	fmt.Printf("PVC %s created at %s\n", created.Name, created.CreationTimestamp)
+	return nil
 }
 
 func PodForward() {
 
 }
 
-func (s *KubernetesUtil) CreateSvc(param model.KubernetesParam) {
+func (s *KubernetesUtil) CreateSvc(kbParam *model.KubernetesParam, appParam *model.AppParam) error {
 	// 3. 构造 Service 对象
 	svc := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "code-server-svc",
-			Namespace: "default",
+			Namespace: kbParam.Namespace,
 			Labels: map[string]string{
 				"app": "code-server",
 			},
@@ -166,7 +146,7 @@ func (s *KubernetesUtil) CreateSvc(param model.KubernetesParam) {
 			Ports: []corev1.ServicePort{
 				{
 					Name:       "web",
-					Port:       80,                     // Service 自己的端口
+					Port:       443,                    // Service 自己的端口
 					TargetPort: intstr.FromInt32(8443), // 目标 Pod 的端口
 					Protocol:   corev1.ProtocolTCP,
 				},
@@ -177,14 +157,15 @@ func (s *KubernetesUtil) CreateSvc(param model.KubernetesParam) {
 
 	// 4. 调用 API 创建
 	result, err := config.KubernetesClient.CoreV1().
-		Services("default").
-		Create(context.TODO(), svc, metav1.CreateOptions{})
+		Services(kbParam.Namespace).
+		Create(s.ctx, svc, metav1.CreateOptions{})
 	if err != nil {
-		panic(err)
+		return err
 	}
 
-	fmt.Printf("Service %q created, clusterIP=%s\n",
-		result.GetName(), result.Spec.ClusterIP)
+	fmt.Printf("Service %q created, clusterIP=%s\n", result.GetName(), result.Spec.ClusterIP)
+
+	return nil
 }
 
 func CreateHttpRoute() {

@@ -9,8 +9,8 @@ type Application struct {
 	Name   string `gorm:"varchar(100); not null; unique" json:"name"`
 	State  string `gorm:"varchar(20)" json:"state"`
 	UserId uint   `gorm:"not null;" json:"user_id"`
-	Cpu    int32  `gorm:"not null;" json:"cpu"`
-	Memory uint64 `gorm:"not null;" json:"memory"`
+	Cpu    string `gorm:"not null;" json:"cpu"`
+	Memory string `gorm:"not null;" json:"memory"`
 }
 
 type AppParam struct {
@@ -22,6 +22,5 @@ type KubernetesParam struct {
 	Namespace string
 	State     string
 	Pvc       string
-	Pv        string
 	Svc       string
 }
