@@ -12,12 +12,14 @@ import (
 
 func Init() {
 	middleware.InitJwt()
-	db := config.InitDB()
 	config.InitRedis()
 	config.InitEmailClient()
+	config.InitKubernetesClient()
+	db := config.InitDB()
 	db.AutoMigrate(
 		&model.User{},
 		&model.Role{},
+		&model.Application{},
 	)
 }
 

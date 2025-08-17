@@ -63,7 +63,7 @@ func (s *UserService) Register(userParam model.UserParam) (uint, error) {
 		return 0, err
 	}
 
-	return user.ID, nil
+	return user.ID, nil 
 }
 
 func (s *UserService) SendEmail(emailParam model.EmailParam) error {
