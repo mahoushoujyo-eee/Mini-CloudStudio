@@ -3,8 +3,10 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/cloudwego/hertz/pkg/app"
+	"github.com/google/uuid"
 
 	"learn/biz/config"
 	"learn/biz/model"
@@ -52,14 +54,37 @@ func (s *AppService) CreateApp(appParam *model.AppParam) error {
 		UserId: userId.(uint),
 		Cpu:    appParam.Cpu,
 		Memory: appParam.Memory,
+		State:  "initializing",
 	}
 
-	util.NewKubernetesUtil(s.ctx)
+	laterfix := uuid.NewString()[:8]
+
+	kbParam := &model.KubernetesParam{
+		Namespace: fmt.Sprintf("ns-%d", userId.(uint)),
+		Pod:       fmt.Sprintf("pod-%s", laterfix),
+		Svc:       fmt.Sprintf("svc-%s", laterfix),
+		Pvc:       fmt.Sprintf("pvc-%s", laterfix),
+		State:     "initializing",
+	}
+
+	go func() {
+		util.NewKubernetesUtil(s.ctx).CreatePvc(kbParam, appParam)
+		util.NewKubernetesUtil(s.ctx).CreatePod(kbParam, appParam)
+		util.NewKubernetesUtil(s.ctx).CreateSvc(kbParam, appParam)
+	}()
 
 	err := config.DB.WithContext(s.ctx).Create(application).Error
 	if err != nil {
 		return err
 	}
 
+	return nil
+}
+
+func (s *AppService) DeleteApp(appParam *model.AppParam) error {
+	return nil
+}
+
+func (s *AppService) GetStateOfApp(appParam *model.AppParam) error {
 	return nil
 }

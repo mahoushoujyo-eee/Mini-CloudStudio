@@ -20,6 +20,7 @@ func UserRegister(ctx context.Context, c *app.RequestContext) {
 			StatusCode: consts.StatusInternalServerError,
 			Message:    err.Error(),
 		})
+		return
 	}
 
 	userId, err := service.NewUserService(ctx, c).Register(userParam)

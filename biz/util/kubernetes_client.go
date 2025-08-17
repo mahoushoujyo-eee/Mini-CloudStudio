@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/google/uuid"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -25,7 +24,7 @@ func NewKubernetesUtil(ctx context.Context) *KubernetesUtil {
 
 func (s *KubernetesUtil) GetPods(param model.KubernetesParam) {
 	// 获取 default namespace 下的所有 Pod
-	pods, err := config.KubernetesClient.CoreV1().Pods(param.Namespace).List(context.TODO(), metav1.ListOptions{})
+	pods, err := config.KubernetesClient.CoreV1().Pods(param.Namespace).List(s.ctx, metav1.ListOptions{})
 	if err != nil {
 		panic(err)
 	}
@@ -36,7 +35,7 @@ func (s *KubernetesUtil) GetPods(param model.KubernetesParam) {
 	}
 }
 
-func (s *KubernetesUtil) CreateCodeServerPod(kbParam *model.KubernetesParam, appParam *model.AppParam) error {
+func (s *KubernetesUtil) CreatePod(kbParam *model.KubernetesParam, appParam *model.AppParam) error {
 	// 3. 创建 Pod
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -99,10 +98,9 @@ func (s *KubernetesUtil) CreateCodeServerPod(kbParam *model.KubernetesParam, app
 
 func (s *KubernetesUtil) CreatePvc(kbParam *model.KubernetesParam, appParam *model.AppParam) error {
 	// 2. 创建 PVC（如已存在则忽略）
-	pvcName := fmt.Sprintf("code-server-%s", uuid.NewString()[:8])
 	pvc := &corev1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      pvcName,
+			Name:      kbParam.Pvc,
 			Namespace: kbParam.Namespace,
 		},
 		Spec: corev1.PersistentVolumeClaimSpec{
@@ -118,7 +116,6 @@ func (s *KubernetesUtil) CreatePvc(kbParam *model.KubernetesParam, appParam *mod
 	if _, err := config.KubernetesClient.CoreV1().PersistentVolumeClaims(kbParam.Namespace).Create(s.ctx, pvc, metav1.CreateOptions{}); err != nil && !errors.IsAlreadyExists(err) {
 		return fmt.Errorf("创建 PVC 失败: %w", err)
 	}
-	kbParam.Pvc = pvcName
 
 	return nil
 }
@@ -131,7 +128,7 @@ func (s *KubernetesUtil) CreateSvc(kbParam *model.KubernetesParam, appParam *mod
 	// 3. 构造 Service 对象
 	svc := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "code-server-svc",
+			Name:      kbParam.Svc,
 			Namespace: kbParam.Namespace,
 			Labels: map[string]string{
 				"app": "code-server",
