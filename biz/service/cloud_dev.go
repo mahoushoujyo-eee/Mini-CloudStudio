@@ -88,3 +88,13 @@ func (s *AppService) DeleteApp(appParam *model.AppParam) error {
 func (s *AppService) GetStateOfApp(appParam *model.AppParam) error {
 	return nil
 }
+
+func (s *AppService) ListApps(appParam *model.AppParam) ([]*model.Application, error) {
+	var applications []*model.Application
+
+	err := config.DB.Model(&model.Application{}).Where("user_id = ?", appParam.UserId).Find(&applications).Error
+	if err != nil {
+		return nil, err
+	}
+	return applications, nil
+}

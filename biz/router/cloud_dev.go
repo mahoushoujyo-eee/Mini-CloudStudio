@@ -18,7 +18,7 @@ func RegisterCloudDev(r *route.RouterGroup) {
 	{
 		commonRouter.GET("/hello", handler.UserHello)
 		commonRouter.GET("/details")
-		commonRouter.GET("/list")
+		commonRouter.GET("/list", handler.AppList)
 		commonRouter.POST("/create", handler.AppCreate)
 		commonRouter.POST("/delete")
 		commonRouter.POST("/update")
