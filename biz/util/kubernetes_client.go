@@ -85,7 +85,7 @@ func (s *KubernetesUtil) CreatePod(kbParam *model.KubernetesParam, appParam *mod
 					{Name: "PUID", Value: "1000"},
 					{Name: "PGID", Value: "1000"},
 					{Name: "TZ", Value: "Etc/UTC"},
-					{Name: "PASSWORD", Value: "password"}, // 让前端传
+					{Name: "PASSWORD", Value: "password"},
 					{Name: "SUDO_PASSWORD", Value: "root"},
 					{Name: "PWA_APPNAME", Value: "code-server"},
 				},
@@ -130,6 +130,8 @@ func (s *KubernetesUtil) CreatePod(kbParam *model.KubernetesParam, appParam *mod
 
 func (s *KubernetesUtil) CreatePvc(kbParam *model.KubernetesParam, appParam *model.AppParam) error {
 	// 2. 创建 PVC（如已存在则忽略）
+	storageClassName := "dynamic-hostpath"
+
 	pvc := &corev1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      kbParam.Pvc,
@@ -139,9 +141,10 @@ func (s *KubernetesUtil) CreatePvc(kbParam *model.KubernetesParam, appParam *mod
 			AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
 			Resources: corev1.VolumeResourceRequirements{
 				Requests: corev1.ResourceList{
-					corev1.ResourceStorage: resource.MustParse("5Gi"),
+					corev1.ResourceStorage: resource.MustParse("20Gi"),
 				},
 			},
+			StorageClassName: &storageClassName,
 			// 不写 StorageClassName 就走默认 openebs-hostpath
 		},
 	}

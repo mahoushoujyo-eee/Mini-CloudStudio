@@ -78,9 +78,21 @@ func (s *AppService) CreateApp(appParam *model.AppParam) (string, error) {
 	log.Printf("开始提交创建请求")
 
 	go func() {
-		util.NewKubernetesUtil(s.ctx).CreatePvc(kbParam, appParam)
-		util.NewKubernetesUtil(s.ctx).CreatePod(kbParam, appParam)
-		util.NewKubernetesUtil(s.ctx).CreateSvc(kbParam, appParam)
+		err := util.NewKubernetesUtil(s.ctx).CreatePvc(kbParam, appParam)
+		if err != nil {
+			log.Printf("创建PVC失败: %v", err)
+			return
+		}
+		err = util.NewKubernetesUtil(s.ctx).CreatePod(kbParam, appParam)
+		if err != nil {
+			log.Printf("创建Pod失败: %v", err)
+			return
+		}
+		err = util.NewKubernetesUtil(s.ctx).CreateSvc(kbParam, appParam)
+		if err != nil {
+			log.Printf("创建Svc失败: %v", err)
+			return
+		}
 	}()
 
 	err := config.DB.WithContext(s.ctx).Create(application).Error
@@ -130,6 +142,11 @@ func (s *AppService) DeleteApp(appParam *model.AppParam) error {
 	}
 
 	err := util.NewKubernetesUtil(s.ctx).DeletePodSvcPvc(kbParam)
+	if err != nil {
+		return err
+	}
+
+	err = config.DB.Delete(&model.Application{}, "id = ?", appParam.ID).Error
 	if err != nil {
 		return err
 	}

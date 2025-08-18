@@ -6,6 +6,8 @@ import (
 	"learn/biz/config"
 	"learn/biz/middleware"
 
+	"github.com/hertz-contrib/logger/accesslog"
+
 	"github.com/cloudwego/hertz/pkg/app/server"
 )
 
@@ -20,6 +22,7 @@ func Init() {
 func main() {
 	Init()
 	h := server.Default()
+	h.Use(accesslog.New())
 	register(h)
 
 	h.Spin()
