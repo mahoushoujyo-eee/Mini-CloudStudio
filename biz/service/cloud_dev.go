@@ -142,7 +142,7 @@ func (s *AppService) DeleteApp(appParam *model.AppParam) error {
 		return err
 	}
 
-	err = config.DB.Delete(&model.Application{}, "id = ?", appParam.ID).Error
+	err = config.DB.Delete(&model.Application{}, "pod_name = ?", appParam.PodName).Error
 	if err != nil {
 		return err
 	}

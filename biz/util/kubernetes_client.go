@@ -44,13 +44,13 @@ func (s *KubernetesUtil) EnsureNamespace(namespace string) error {
 				return fmt.Errorf("创建命名空间失败: %w", createErr)
 			}
 
-			fmt.Printf("命名空间 %s 创建成功\n", namespace)
+			log.Printf("命名空间 %s 创建成功\n", namespace)
 			return nil
 		}
 		return fmt.Errorf("检查命名空间失败: %w", err)
 	}
 
-	fmt.Printf("命名空间 %s 已存在\n", namespace)
+	log.Printf("命名空间 %s 已存在\n", namespace)
 	return nil
 }
 
@@ -222,6 +222,8 @@ func (s *KubernetesUtil) DeletePodSvcPvc(kbParam *model.KubernetesParam) error {
 		log.Printf("删除 PVC 失败: %v", err)
 		return fmt.Errorf("删除 PVC 失败: %w", err)
 	}
+
+	log.Printf("删除pod: %s 相关的所有资源", kbParam.Pod)
 
 	return nil
 }
