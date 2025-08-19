@@ -85,7 +85,7 @@ func (s *KubernetesUtil) CreatePod(kbParam *model.KubernetesParam, appParam *mod
 					{Name: "PUID", Value: "1000"},
 					{Name: "PGID", Value: "1000"},
 					{Name: "TZ", Value: "Etc/UTC"},
-					{Name: "PASSWORD", Value: "password"},
+					{Name: "PASSWORD", Value: appParam.PodPassword},
 					{Name: "SUDO_PASSWORD", Value: "root"},
 					{Name: "PWA_APPNAME", Value: "code-server"},
 					{Name: "HTTP_PROXY", Value: "http://223.2.19.172:3128"},

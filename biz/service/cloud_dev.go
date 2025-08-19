@@ -153,7 +153,12 @@ func (s *AppService) DeleteApp(appParam *model.AppParam) error {
 func (s *AppService) ListApps(appParam *model.AppParam) ([]*model.Application, error) {
 	var applications []*model.Application
 
-	err := config.DB.Model(&model.Application{}).Where("user_id = ?", appParam.UserId).Find(&applications).Error
+	userId, ok := s.c.Get("user_id")
+	if !ok {
+		return nil, errors.New("没有找到用户ID")
+	}
+
+	err := config.DB.Model(&model.Application{}).Where("user_id = ?", userId.(int64)).Find(&applications).Error
 	if err != nil {
 		return nil, err
 	}
