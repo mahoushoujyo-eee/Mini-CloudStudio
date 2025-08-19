@@ -6,15 +6,18 @@ import (
 
 type Application struct {
 	gorm.Model
-	Name   string `gorm:"varchar(100); not null;" json:"name"`
-	State  string `gorm:"varchar(20)" json:"state"`
-	UserId uint   `gorm:"not null;" json:"user_id"`
-	Cpu    string `gorm:"not null;" json:"cpu"`
-	Memory string `gorm:"not null;" json:"memory"`
+	Name    string `gorm:"type:varchar(100); not null;" json:"name"`
+	PodName string `gorm:"type:varchar(100); not null; unique" json:"pod_name"`
+	State   string `gorm:"type:varchar(20)" json:"state"`
+	UserId  uint   `gorm:"type:integer; not null;" json:"user_id"`
+	Cpu     string `gorm:"type:varchar(100); not null;" json:"cpu"`
+	Memory  string `gorm:"type:varchar(100); not null;" json:"memory"`
+	Url     string `gorm:"type:varchar(255); not null;" json:"url"`
 }
 
 type AppParam struct {
 	Application
+	PodPassword string `json:"pod_password"`
 }
 
 type KubernetesParam struct {

@@ -51,14 +51,6 @@ func (s *AppService) CreateApp(appParam *model.AppParam) (string, error) {
 		return "", errors.New("没有找到用户ID")
 	}
 
-	application := &model.Application{
-		Name:   appParam.Name,
-		UserId: uint(userId.(int64)),
-		Cpu:    appParam.Cpu,
-		Memory: appParam.Memory,
-		State:  "initializing",
-	}
-
 	laterfix := uuid.NewString()[:8]
 
 	kbParam := &model.KubernetesParam{
@@ -67,6 +59,15 @@ func (s *AppService) CreateApp(appParam *model.AppParam) (string, error) {
 		Svc:       fmt.Sprintf("svc-%s", laterfix),
 		Pvc:       fmt.Sprintf("pvc-%s", laterfix),
 		State:     "initializing",
+	}
+
+	application := &model.Application{
+		Name:    appParam.Name,
+		UserId:  uint(userId.(int64)),
+		Cpu:     appParam.Cpu,
+		Memory:  appParam.Memory,
+		State:   "initializing",
+		PodName: fmt.Sprintf("pod-%s", laterfix),
 	}
 
 	// 确保命名空间存在
@@ -88,17 +89,12 @@ func (s *AppService) CreateApp(appParam *model.AppParam) (string, error) {
 			log.Printf("创建Pod失败: %v", err)
 			return
 		}
-		err = util.NewKubernetesUtil(s.ctx).CreateSvc(kbParam, appParam)
+		err = util.NewKubernetesUtil(s.ctx).CreateSvc(kbParam, application)
 		if err != nil {
 			log.Printf("创建Svc失败: %v", err)
 			return
 		}
 	}()
-
-	err := config.DB.WithContext(s.ctx).Create(application).Error
-	if err != nil {
-		return "", err
-	}
 
 	return kbParam.Pod, nil
 }
@@ -128,8 +124,8 @@ func (s *AppService) DeleteApp(appParam *model.AppParam) error {
 	}
 
 	var laterfix string
-	if len(appParam.Name) >= 8 {
-		laterfix = appParam.Name[len(appParam.Name)-8:]
+	if len(appParam.PodName) >= 8 {
+		laterfix = appParam.PodName[len(appParam.PodName)-8:]
 	} else {
 		return errors.New("应用名称错误！")
 	}

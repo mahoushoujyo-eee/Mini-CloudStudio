@@ -88,6 +88,8 @@ func (s *KubernetesUtil) CreatePod(kbParam *model.KubernetesParam, appParam *mod
 					{Name: "PASSWORD", Value: "password"},
 					{Name: "SUDO_PASSWORD", Value: "root"},
 					{Name: "PWA_APPNAME", Value: "code-server"},
+					{Name: "HTTP_PROXY", Value: "http://223.2.19.172:3128"},
+					{Name: "HTTPS_PROXY", Value: "http://223.2.19.172:3128"},
 				},
 				Ports: []corev1.ContainerPort{{
 					ContainerPort: 8443,
@@ -156,7 +158,7 @@ func (s *KubernetesUtil) CreatePvc(kbParam *model.KubernetesParam, appParam *mod
 	return nil
 }
 
-func (s *KubernetesUtil) CreateSvc(kbParam *model.KubernetesParam, appParam *model.AppParam) error {
+func (s *KubernetesUtil) CreateSvc(kbParam *model.KubernetesParam, application *model.Application) error {
 	// 3. 构造 Service 对象
 	svc := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
@@ -180,7 +182,7 @@ func (s *KubernetesUtil) CreateSvc(kbParam *model.KubernetesParam, appParam *mod
 					Protocol:   corev1.ProtocolTCP,
 				},
 			},
-			Type: corev1.ServiceTypeClusterIP, // 可改成 NodePort / LoadBalancer
+			Type: corev1.ServiceTypeNodePort, // 可改成 NodePort / LoadBalancer
 		},
 	}
 
@@ -193,7 +195,14 @@ func (s *KubernetesUtil) CreateSvc(kbParam *model.KubernetesParam, appParam *mod
 		return err
 	}
 
-	log.Printf("Service %q created, clusterIP=%s\n", result.GetName(), result.Spec.ClusterIP)
+	nodePort := result.Spec.Ports[0].NodePort
+	application.Url = fmt.Sprintf("http://223.2.19.172:%d", nodePort)
+	log.Printf("分配的NodePort端口: %d", nodePort)
+
+	err = config.DB.WithContext(s.ctx).Create(application).Error
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
