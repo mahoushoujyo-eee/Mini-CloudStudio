@@ -48,6 +48,7 @@ func AppStop(ctx context.Context, c *app.RequestContext) {
 			StatusCode: consts.StatusInternalServerError,
 			Message:    err.Error(),
 		})
+		return
 	}
 
 	err = service.NewAppService(ctx, c).StopApp(&appParam)
@@ -56,6 +57,7 @@ func AppStop(ctx context.Context, c *app.RequestContext) {
 			StatusCode: consts.StatusInternalServerError,
 			Message:    err.Error(),
 		})
+		return
 	}
 
 	c.JSON(consts.StatusOK, model.Response{
@@ -73,6 +75,7 @@ func AppRestart(ctx context.Context, c *app.RequestContext) {
 			StatusCode: consts.StatusInternalServerError,
 			Message:    err.Error(),
 		})
+		return
 	}
 
 	err = service.NewAppService(ctx, c).RestartApp(&appParam)
@@ -81,6 +84,7 @@ func AppRestart(ctx context.Context, c *app.RequestContext) {
 			StatusCode: consts.StatusInternalServerError,
 			Message:    err.Error(),
 		})
+		return
 	}
 
 	c.JSON(consts.StatusOK, model.Response{
