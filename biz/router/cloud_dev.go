@@ -20,7 +20,11 @@ func RegisterCloudDev(r *route.RouterGroup) {
 		commonRouter.POST("/details", handler.AppGetPodInfo)
 		commonRouter.GET("/list", handler.AppList)
 		commonRouter.POST("/create", handler.AppCreate)
+		commonRouter.POST("/stop", handler.AppStop)
+		commonRouter.POST("/restart", handler.AppRestart)
 		commonRouter.POST("/delete", handler.AppDelete)
+		commonRouter.GET("/details/list", handler.AppGetPodStateList)
+		commonRouter.GET("/log", handler.AppGetLog)
 		commonRouter.POST("/update")
 	}
 

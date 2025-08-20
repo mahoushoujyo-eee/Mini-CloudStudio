@@ -3,6 +3,7 @@ package util
 import (
 	"context"
 	"fmt"
+	"io"
 	"log"
 
 	corev1 "k8s.io/api/core/v1"
@@ -54,17 +55,16 @@ func (s *KubernetesUtil) EnsureNamespace(namespace string) error {
 	return nil
 }
 
-func (s *KubernetesUtil) GetPodList(param model.KubernetesParam) {
+func (s *KubernetesUtil) GetPodList(param model.KubernetesParam) (*corev1.PodList, error) {
 	// 获取 namespace 下的所有 Pod
 	pods, err := config.KubernetesClient.CoreV1().Pods(param.Namespace).List(s.ctx, metav1.ListOptions{})
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 
-	fmt.Printf("Found %d pods in 'default' namespace:\n", len(pods.Items))
-	for _, pod := range pods.Items {
-		fmt.Println(" -", pod.Name)
-	}
+	log.Printf("Found %d pods in '%s' namespace:\n", len(pods.Items), param.Namespace)
+
+	return pods, nil
 }
 
 func (s *KubernetesUtil) CreatePod(kbParam *model.KubernetesParam, appParam *model.AppParam) error {
@@ -86,7 +86,7 @@ func (s *KubernetesUtil) CreatePod(kbParam *model.KubernetesParam, appParam *mod
 					{Name: "PGID", Value: "1000"},
 					{Name: "TZ", Value: "Etc/UTC"},
 					{Name: "PASSWORD", Value: appParam.PodPassword},
-					{Name: "SUDO_PASSWORD", Value: "root"},
+					{Name: "SUDO_PASSWORD", Value: appParam.PodPassword},
 					{Name: "PWA_APPNAME", Value: "code-server"},
 					{Name: "HTTP_PROXY", Value: "http://223.2.19.172:3128"},
 					{Name: "HTTPS_PROXY", Value: "http://223.2.19.172:3128"},
@@ -207,6 +207,71 @@ func (s *KubernetesUtil) CreateSvc(kbParam *model.KubernetesParam, application *
 	return nil
 }
 
+func (s *KubernetesUtil) CreateSvcWithUpdate(kbParam *model.KubernetesParam, application *model.Application) error {
+	// 3. 构造 Service 对象
+	svc := &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      kbParam.Svc,
+			Namespace: kbParam.Namespace,
+			Labels: map[string]string{
+				"app": "code-server",
+			},
+		},
+		Spec: corev1.ServiceSpec{
+			// 绑定到哪些 Pod（通过 label 选择）
+			Selector: map[string]string{
+				"app": "code-server",
+			},
+			// 暴露的端口列表
+			Ports: []corev1.ServicePort{
+				{
+					Name:       "web",
+					Port:       443,                    // Service 自己的端口
+					TargetPort: intstr.FromInt32(8443), // 目标 Pod 的端口
+					Protocol:   corev1.ProtocolTCP,
+				},
+			},
+			Type: corev1.ServiceTypeNodePort, // 可改成 NodePort / LoadBalancer
+		},
+	}
+	// 4. 调用 API 创建
+	result, err := config.KubernetesClient.CoreV1().
+		Services(kbParam.Namespace).
+		Update(s.ctx, svc, metav1.UpdateOptions{})
+	if err != nil {
+		log.Printf("创建 Service 失败: %w", err)
+		return err
+	}
+
+	nodePort := result.Spec.Ports[0].NodePort
+	application.Url = fmt.Sprintf("http://223.2.19.172:%d", nodePort)
+	log.Printf("分配的NodePort端口: %d", nodePort)
+
+	err = config.DB.WithContext(s.ctx).Model(&model.Application{}).Where("pod_name = ?", application.PodName).Updates(map[string]interface{}{
+		"url": application.Url,
+	}).Error
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (s *KubernetesUtil) DeletePodSvc(kbParam *model.KubernetesParam) error {
+	err := config.KubernetesClient.CoreV1().Pods(kbParam.Namespace).Delete(s.ctx, kbParam.Pod, metav1.DeleteOptions{})
+	if err != nil {
+		log.Printf("删除 Pod 失败: %v", err)
+		return fmt.Errorf("删除 Pod 失败: %w", err)
+	}
+
+	if err := config.KubernetesClient.CoreV1().Services(kbParam.Namespace).Delete(s.ctx, kbParam.Svc, metav1.DeleteOptions{}); err != nil {
+		log.Printf("删除 Service 失败: %v", err)
+		return fmt.Errorf("删除 Service 失败: %w", err)
+	}
+
+	return nil
+}
+
 func (s *KubernetesUtil) DeletePodSvcPvc(kbParam *model.KubernetesParam) error {
 	if err := config.KubernetesClient.CoreV1().Pods(kbParam.Namespace).Delete(s.ctx, kbParam.Pod, metav1.DeleteOptions{}); err != nil {
 		log.Printf("删除 Pod 失败: %v", err)
@@ -234,6 +299,29 @@ func (s *KubernetesUtil) GetPodInfo(kbParam *model.KubernetesParam) (*corev1.Pod
 		return nil, fmt.Errorf("获取Pod信息失败: %w", err)
 	}
 	return pod, nil
+}
+
+func (s *KubernetesUtil) GetLogOfPod(kbParam *model.KubernetesParam) (string, error) {
+	req := config.KubernetesClient.CoreV1().Pods(kbParam.Namespace).GetLogs(kbParam.Pod, &corev1.PodLogOptions{})
+	podLogs, err := req.Stream(s.ctx)
+
+	if err != nil {
+		return "", fmt.Errorf("获取Pod日志失败: %w", err)
+	}
+
+	defer func(podLogs io.ReadCloser) {
+		err := podLogs.Close()
+		if err != nil {
+			log.Printf("关闭Pod日志流失败: %w", err)
+		}
+	}(podLogs)
+
+	data, err := io.ReadAll(podLogs)
+
+	if err != nil {
+		return "", err
+	}
+	return string(data), nil
 }
 
 func CreateHttpRoute() {

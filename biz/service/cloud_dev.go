@@ -116,6 +116,25 @@ func (s *AppService) GetStateOfApp(kbParam *model.KubernetesParam) (*corev1.PodS
 	return &podInfo.Status, nil
 }
 
+func (s *AppService) GetPodStateList() ([]corev1.Pod, error) {
+	userId, ok := s.c.Get("user_id")
+
+	if !ok {
+		return nil, errors.New("没有找到用户ID")
+	}
+
+	kbParam := &model.KubernetesParam{
+		Namespace: fmt.Sprintf("ns-%d", userId.(int64)),
+	}
+
+	podList, err := util.NewKubernetesUtil(s.ctx).GetPodList(*kbParam)
+	if err != nil {
+		return nil, err
+	}
+
+	return podList.Items, nil
+}
+
 func (s *AppService) DeleteApp(appParam *model.AppParam) error {
 	userId, ok := s.c.Get("user_id")
 
@@ -150,7 +169,75 @@ func (s *AppService) DeleteApp(appParam *model.AppParam) error {
 	return nil
 }
 
-func (s *AppService) ListApps(appParam *model.AppParam) ([]*model.Application, error) {
+func (s *AppService) StopApp(appParam *model.AppParam) error {
+	userId, ok := s.c.Get("user_id")
+	if !ok {
+		return errors.New("没有找到用户ID")
+	}
+
+	var laterfix string
+	if len(appParam.PodName) >= 8 {
+		laterfix = appParam.PodName[len(appParam.PodName)-8:]
+	} else {
+		return errors.New("应用名称错误！")
+	}
+
+	kbParam := &model.KubernetesParam{
+		Namespace: fmt.Sprintf("ns-%d", userId.(int64)),
+		Pod:       fmt.Sprintf("pod-%s", laterfix),
+		Svc:       fmt.Sprintf("svc-%s", laterfix),
+		Pvc:       fmt.Sprintf("pvc-%s", laterfix),
+	}
+
+	err := util.NewKubernetesUtil(s.ctx).DeletePodSvc(kbParam)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (s *AppService) RestartApp(appParam *model.AppParam) error {
+	userId, ok := s.c.Get("user_id")
+	if !ok {
+		return errors.New("没有找到用户ID")
+	}
+
+	var laterfix string
+	if len(appParam.PodName) >= 8 {
+		laterfix = appParam.PodName[len(appParam.PodName)-8:]
+	} else {
+		return errors.New("应用名称错误！")
+	}
+
+	kbParam := &model.KubernetesParam{
+		Namespace: fmt.Sprintf("ns-%d", userId.(int64)),
+		Pod:       fmt.Sprintf("pod-%s", laterfix),
+		Svc:       fmt.Sprintf("svc-%s", laterfix),
+		Pvc:       fmt.Sprintf("pvc-%s", laterfix),
+	}
+
+	application := &model.Application{
+		PodName: appParam.PodName,
+	}
+
+	go func() {
+		err := util.NewKubernetesUtil(s.ctx).CreatePod(kbParam, appParam)
+		if err != nil {
+			log.Printf("创建Pod失败: %v", err)
+			return
+		}
+		err = util.NewKubernetesUtil(s.ctx).CreateSvcWithUpdate(kbParam, application)
+		if err != nil {
+			log.Printf("创建Svc失败: %v", err)
+			return
+		}
+	}()
+
+	return nil
+}
+
+func (s *AppService) ListApp() ([]*model.Application, error) {
 	var applications []*model.Application
 
 	userId, ok := s.c.Get("user_id")
@@ -163,4 +250,23 @@ func (s *AppService) ListApps(appParam *model.AppParam) ([]*model.Application, e
 		return nil, err
 	}
 	return applications, nil
+}
+
+func (s *AppService) GetLogOfApp(appParam *model.AppParam) (string, error) {
+	userId, ok := s.c.Get("user_id")
+	if !ok {
+		return "", errors.New("没有找到用户ID")
+	}
+
+	kbParam := &model.KubernetesParam{
+		Namespace: fmt.Sprintf("ns-%d", userId.(int64)),
+		Pod:       appParam.PodName,
+	}
+
+	logs, err := util.NewKubernetesUtil(s.ctx).GetLogOfPod(kbParam)
+	if err != nil {
+		return "", err
+	}
+
+	return logs, nil
 }
