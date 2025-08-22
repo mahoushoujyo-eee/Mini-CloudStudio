@@ -20,6 +20,7 @@ func RegisterUser(r *route.RouterGroup) {
 	commonRouter := r.Group("/common", middleware.JwtMiddleware.MiddlewareFunc())
 	{
 		commonRouter.GET("/hello", handler.UserHello)
+		commonRouter.GET("/info", handler.UserInfo)
 	}
 
 	adminRouter := r.Group("/admin")

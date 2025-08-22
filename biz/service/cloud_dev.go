@@ -24,7 +24,7 @@ func NewAppService(ctx context.Context, c *app.RequestContext) *AppService {
 	return &AppService{ctx: ctx, c: c}
 }
 
-func (s *AppService) ListPods() ([]*model.Application, error) {
+func (s *AppService) ListApp() ([]*model.Application, error) {
 	userId, ok := s.c.Get("user_id")
 	if !ok {
 		return nil, errors.New("没有找到用户ID")
@@ -38,6 +38,39 @@ func (s *AppService) ListPods() ([]*model.Application, error) {
 
 	if err != nil {
 		return nil, err
+	}
+
+	// 为每个应用查询Pod状态并设置State
+	kubernetesUtil := util.NewKubernetesUtil(s.ctx)
+	namespace := fmt.Sprintf("ns-%d", userId.(int64))
+
+	for i := range applications {
+		kbParam := &model.KubernetesParam{
+			Namespace:  namespace,
+			Deployment: applications[i].Deployment,
+		}
+
+		// 查询Pod信息
+		pod, err := kubernetesUtil.GetPodInfo(kbParam)
+		if err != nil {
+			log.Printf("获取Pod信息失败 - Deployment: %s, Error: %v", applications[i].Deployment, err)
+			applications[i].State = "stopped"
+			continue
+		}
+
+		// 根据Pod状态设置State
+		switch pod.Status.Phase {
+		case corev1.PodPending:
+			applications[i].State = "pending"
+		case corev1.PodRunning:
+			applications[i].State = "running"
+		case corev1.PodSucceeded:
+			applications[i].State = "succeeded"
+		case corev1.PodFailed:
+			applications[i].State = "failed"
+		default:
+			applications[i].State = "stopped"
+		}
 	}
 
 	return applications, nil
@@ -258,21 +291,6 @@ func (s *AppService) RestartApp(appParam *model.AppParam) error {
 	}()
 
 	return nil
-}
-
-func (s *AppService) ListApp() ([]*model.Application, error) {
-	var applications []*model.Application
-
-	userId, ok := s.c.Get("user_id")
-	if !ok {
-		return nil, errors.New("没有找到用户ID")
-	}
-
-	err := config.DB.Model(&model.Application{}).Where("user_id = ?", userId.(int64)).Find(&applications).Error
-	if err != nil {
-		return nil, err
-	}
-	return applications, nil
 }
 
 func (s *AppService) GetLogOfApp(appParam *model.AppParam) (string, error) {

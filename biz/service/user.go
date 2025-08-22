@@ -63,7 +63,7 @@ func (s *UserService) Register(userParam model.UserParam) (uint, error) {
 		return 0, err
 	}
 
-	return user.ID, nil 
+	return user.ID, nil
 }
 
 func (s *UserService) SendEmail(emailParam model.EmailParam) error {
@@ -106,4 +106,18 @@ func (s *UserService) ResetPassword(emailParam model.EmailParam) error {
 	}
 
 	return nil
+}
+
+func (s *UserService) GetUserInfo() (model.User, error) {
+	userId, ok := s.c.Get("user_id")
+	if !ok {
+		return model.User{}, errors.New("没有找到用户ID")
+	}
+
+	var user model.User
+	err := config.DB.Model(&model.User{}).Where("id = ?", userId.(uint)).First(&user).Error
+	if err != nil {
+		return model.User{}, err
+	}
+	return user, nil
 }

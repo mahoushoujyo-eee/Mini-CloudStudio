@@ -13,6 +13,7 @@ type Application struct {
 	Memory     string `gorm:"type:varchar(100); not null;" json:"memory"`
 	Url        string `gorm:"type:varchar(255); not null;" json:"url"`
 	Deployment string `gorm:"type:varchar(100); not null;" json:"deployment"`
+	State      string `gorm:"-" json:"state"`
 }
 
 type AppParam struct {

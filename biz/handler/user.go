@@ -102,3 +102,19 @@ func UserResetPassword(ctx context.Context, c *app.RequestContext) {
 		Message:    "Success",
 	})
 }
+
+func UserInfo(ctx context.Context, c *app.RequestContext) {
+	user, err := service.NewUserService(ctx, c).GetUserInfo()
+	if err != nil {
+		c.JSON(consts.StatusOK, model.Response{
+			StatusCode: consts.StatusInternalServerError,
+			Message:    err.Error(),
+		})
+		return
+	}
+	c.JSON(consts.StatusOK, model.Response{
+		StatusCode: consts.StatusOK,
+		Data:       user,
+		Message:    "Success",
+	})
+}
