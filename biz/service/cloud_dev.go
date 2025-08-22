@@ -54,23 +54,23 @@ func (s *AppService) CreateApp(appParam *model.AppParam) (string, error) {
 	laterfix := uuid.NewString()[:8]
 
 	kbParam := &model.KubernetesParam{
-		Namespace: fmt.Sprintf("ns-%d", userId.(int64)),
-		Pod:       fmt.Sprintf("pod-%s", laterfix),
-		Svc:       fmt.Sprintf("svc-%s", laterfix),
-		Pvc:       fmt.Sprintf("pvc-%s", laterfix),
-		State:     "initializing",
+		Namespace:  fmt.Sprintf("ns-%d", userId.(int64)),
+		Deployment: fmt.Sprintf("deployment-%s", laterfix),
+		Pod:        fmt.Sprintf("pod-%s", laterfix),
+		Svc:        fmt.Sprintf("svc-%s", laterfix),
+		Pvc:        fmt.Sprintf("pvc-%s", laterfix),
+		State:      "initializing",
 	}
 
 	application := &model.Application{
-		Name:    appParam.Name,
-		UserId:  uint(userId.(int64)),
-		Cpu:     appParam.Cpu,
-		Memory:  appParam.Memory,
-		State:   "initializing",
-		PodName: fmt.Sprintf("pod-%s", laterfix),
+		Name:       appParam.Name,
+		UserId:     uint(userId.(int64)),
+		Cpu:        appParam.Cpu,
+		Memory:     appParam.Memory,
+		PodName:    kbParam.Pod,
+		Deployment: kbParam.Deployment,
 	}
 
-	// 确保命名空间存在
 	if err := util.NewKubernetesUtil(s.ctx).EnsureNamespace(kbParam.Namespace); err != nil {
 		log.Printf("创建命名空间失败: %v", err)
 		return "", err
@@ -84,9 +84,9 @@ func (s *AppService) CreateApp(appParam *model.AppParam) (string, error) {
 			log.Printf("创建PVC失败: %v", err)
 			return
 		}
-		err = util.NewKubernetesUtil(s.ctx).CreatePod(kbParam, appParam)
+		err = util.NewKubernetesUtil(s.ctx).CreateDeployment(kbParam, appParam)
 		if err != nil {
-			log.Printf("创建Pod失败: %v", err)
+			log.Printf("创建Deployment失败: %v", err)
 			return
 		}
 		err = util.NewKubernetesUtil(s.ctx).CreateSvc(kbParam, application)
@@ -94,9 +94,14 @@ func (s *AppService) CreateApp(appParam *model.AppParam) (string, error) {
 			log.Printf("创建Svc失败: %v", err)
 			return
 		}
+		err = config.DB.WithContext(s.ctx).Create(application).Error
+		if err != nil {
+			log.Printf("插入数据库失败: %v", err)
+			return
+		}
 	}()
 
-	return kbParam.Pod, nil
+	return kbParam.Deployment, nil
 }
 
 func (s *AppService) GetStateOfApp(kbParam *model.KubernetesParam) (*corev1.PodStatus, error) {
@@ -127,7 +132,7 @@ func (s *AppService) GetPodStateList() ([]corev1.Pod, error) {
 		Namespace: fmt.Sprintf("ns-%d", userId.(int64)),
 	}
 
-	podList, err := util.NewKubernetesUtil(s.ctx).GetPodList(*kbParam)
+	podList, err := util.NewKubernetesUtil(s.ctx).GetPodList(kbParam)
 	if err != nil {
 		return nil, err
 	}
@@ -137,31 +142,31 @@ func (s *AppService) GetPodStateList() ([]corev1.Pod, error) {
 
 func (s *AppService) DeleteApp(appParam *model.AppParam) error {
 	userId, ok := s.c.Get("user_id")
-
 	if !ok {
 		return errors.New("没有找到用户ID")
 	}
 
 	var laterfix string
-	if len(appParam.PodName) >= 8 {
-		laterfix = appParam.PodName[len(appParam.PodName)-8:]
+	if len(appParam.Deployment) >= 8 {
+		laterfix = appParam.Deployment[len(appParam.Deployment)-8:]
 	} else {
 		return errors.New("应用名称错误！")
 	}
 
 	kbParam := &model.KubernetesParam{
-		Namespace: fmt.Sprintf("ns-%d", userId.(int64)),
-		Pod:       fmt.Sprintf("pod-%s", laterfix),
-		Svc:       fmt.Sprintf("svc-%s", laterfix),
-		Pvc:       fmt.Sprintf("pvc-%s", laterfix),
+		Namespace:  fmt.Sprintf("ns-%d", userId.(int64)),
+		Deployment: fmt.Sprintf("deployment-%s", laterfix),
+		Pod:        fmt.Sprintf("pod-%s", laterfix),
+		Svc:        fmt.Sprintf("svc-%s", laterfix),
+		Pvc:        fmt.Sprintf("pvc-%s", laterfix),
 	}
 
-	err := util.NewKubernetesUtil(s.ctx).DeletePodSvcPvc(kbParam)
+	err := util.NewKubernetesUtil(s.ctx).DeleteDeploymentSvcPvc(kbParam)
 	if err != nil {
 		return err
 	}
 
-	err = config.DB.Delete(&model.Application{}, "pod_name = ?", appParam.PodName).Error
+	err = config.DB.Delete(&model.Application{}, "deployment = ?", appParam.Deployment).Error
 	if err != nil {
 		return err
 	}
@@ -176,23 +181,31 @@ func (s *AppService) StopApp(appParam *model.AppParam) error {
 	}
 
 	var laterfix string
-	if len(appParam.PodName) >= 8 {
-		laterfix = appParam.PodName[len(appParam.PodName)-8:]
+	if len(appParam.Deployment) >= 8 {
+		laterfix = appParam.Deployment[len(appParam.Deployment)-8:]
 	} else {
 		return errors.New("应用名称错误！")
 	}
 
 	kbParam := &model.KubernetesParam{
-		Namespace: fmt.Sprintf("ns-%d", userId.(int64)),
-		Pod:       fmt.Sprintf("pod-%s", laterfix),
-		Svc:       fmt.Sprintf("svc-%s", laterfix),
-		Pvc:       fmt.Sprintf("pvc-%s", laterfix),
+		Namespace:  fmt.Sprintf("ns-%d", userId.(int64)),
+		Deployment: fmt.Sprintf("deployment-%s", laterfix),
+		Pod:        fmt.Sprintf("pod-%s", laterfix),
+		Svc:        fmt.Sprintf("svc-%s", laterfix),
+		Pvc:        fmt.Sprintf("pvc-%s", laterfix),
 	}
 
-	err := util.NewKubernetesUtil(s.ctx).DeletePodSvc(kbParam)
-	if err != nil {
-		return err
-	}
+	go func() {
+		err := util.NewKubernetesUtil(s.ctx).DeleteSvc(kbParam)
+		if err != nil {
+			log.Printf("删除Svc失败: %v", err)
+		}
+
+		err = util.NewKubernetesUtil(s.ctx).ScaleDeployment(kbParam, 0)
+		if err != nil {
+			log.Printf("修改Deployment副本数失败: %v", err)
+		}
+	}()
 
 	return nil
 }
@@ -204,32 +217,42 @@ func (s *AppService) RestartApp(appParam *model.AppParam) error {
 	}
 
 	var laterfix string
-	if len(appParam.PodName) >= 8 {
-		laterfix = appParam.PodName[len(appParam.PodName)-8:]
+	if len(appParam.Deployment) >= 8 {
+		laterfix = appParam.Deployment[len(appParam.Deployment)-8:]
 	} else {
 		return errors.New("应用名称错误！")
 	}
 
 	kbParam := &model.KubernetesParam{
-		Namespace: fmt.Sprintf("ns-%d", userId.(int64)),
-		Pod:       fmt.Sprintf("pod-%s", laterfix),
-		Svc:       fmt.Sprintf("svc-%s", laterfix),
-		Pvc:       fmt.Sprintf("pvc-%s", laterfix),
+		Namespace:  fmt.Sprintf("ns-%d", userId.(int64)),
+		Deployment: fmt.Sprintf("deployment-%s", laterfix),
+		Pod:        fmt.Sprintf("pod-%s", laterfix),
+		Svc:        fmt.Sprintf("svc-%s", laterfix),
+		Pvc:        fmt.Sprintf("pvc-%s", laterfix),
 	}
 
 	application := &model.Application{
-		PodName: appParam.PodName,
+		Deployment: appParam.Deployment,
 	}
 
 	go func() {
-		err := util.NewKubernetesUtil(s.ctx).CreatePod(kbParam, appParam)
+		err := util.NewKubernetesUtil(s.ctx).ScaleDeployment(kbParam, 1)
 		if err != nil {
-			log.Printf("创建Pod失败: %v", err)
+			log.Printf("修改Deployment副本数失败: %v", err)
 			return
 		}
-		err = util.NewKubernetesUtil(s.ctx).CreateSvcWithUpdate(kbParam, application)
+		err = util.NewKubernetesUtil(s.ctx).CreateSvc(kbParam, application)
 		if err != nil {
 			log.Printf("创建Svc失败: %v", err)
+			return
+		}
+
+		err = config.DB.WithContext(s.ctx).Model(&model.Application{}).Where("deployment = ?", application.Deployment).Updates(map[string]interface{}{
+			"url": application.Url,
+		}).Error
+
+		if err != nil {
+			log.Printf("更新应用URL失败: %v", err)
 			return
 		}
 	}()
@@ -259,11 +282,12 @@ func (s *AppService) GetLogOfApp(appParam *model.AppParam) (string, error) {
 	}
 
 	kbParam := &model.KubernetesParam{
-		Namespace: fmt.Sprintf("ns-%d", userId.(int64)),
-		Pod:       appParam.PodName,
+		Namespace:  fmt.Sprintf("ns-%d", userId.(int64)),
+		Pod:        appParam.PodName,
+		Deployment: appParam.Deployment,
 	}
 
-	logs, err := util.NewKubernetesUtil(s.ctx).GetLogOfPod(kbParam)
+	logs, err := util.NewKubernetesUtil(s.ctx).GetPodLog(kbParam)
 	if err != nil {
 		return "", err
 	}

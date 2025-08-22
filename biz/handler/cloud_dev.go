@@ -24,7 +24,7 @@ func AppCreate(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	podName, err := service.NewAppService(ctx, c).CreateApp(&appParam)
+	deployment, err := service.NewAppService(ctx, c).CreateApp(&appParam)
 	if err != nil {
 		c.JSON(consts.StatusOK, model.Response{
 			StatusCode: consts.StatusInternalServerError,
@@ -36,7 +36,7 @@ func AppCreate(ctx context.Context, c *app.RequestContext) {
 	c.JSON(consts.StatusOK, model.Response{
 		StatusCode: consts.StatusOK,
 		Message:    "ok",
-		Data:       podName,
+		Data:       deployment,
 	})
 }
 

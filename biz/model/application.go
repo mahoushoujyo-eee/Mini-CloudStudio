@@ -6,13 +6,13 @@ import (
 
 type Application struct {
 	gorm.Model
-	Name    string `gorm:"type:varchar(100); not null;" json:"name"`
-	PodName string `gorm:"type:varchar(100); not null; unique" json:"pod_name"`
-	State   string `gorm:"type:varchar(20)" json:"state"`
-	UserId  uint   `gorm:"type:integer; not null;" json:"user_id"`
-	Cpu     string `gorm:"type:varchar(100); not null;" json:"cpu"`
-	Memory  string `gorm:"type:varchar(100); not null;" json:"memory"`
-	Url     string `gorm:"type:varchar(255); not null;" json:"url"`
+	Name       string `gorm:"type:varchar(100); not null;" json:"name"`
+	PodName    string `gorm:"type:varchar(100); not null; unique" json:"pod_name"`
+	UserId     uint   `gorm:"type:integer; not null;" json:"user_id"`
+	Cpu        string `gorm:"type:varchar(100); not null;" json:"cpu"`
+	Memory     string `gorm:"type:varchar(100); not null;" json:"memory"`
+	Url        string `gorm:"type:varchar(255); not null;" json:"url"`
+	Deployment string `gorm:"type:varchar(100); not null;" json:"deployment"`
 }
 
 type AppParam struct {
@@ -21,9 +21,12 @@ type AppParam struct {
 }
 
 type KubernetesParam struct {
-	Pod       string
-	Namespace string
-	State     string
-	Pvc       string
-	Svc       string
+	Deployment string
+	Pod        string
+	Namespace  string
+	State      string
+	Pvc        string
+	Svc        string
+	Cpu        string
+	Memory     string
 }
