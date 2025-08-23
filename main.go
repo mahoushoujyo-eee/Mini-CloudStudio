@@ -3,20 +3,47 @@
 package main
 
 import (
+	"context"
 	"learn/biz/config"
 	"learn/biz/middleware"
-
-	"github.com/hertz-contrib/logger/accesslog"
+	"learn/biz/task"
+	"sync"
 
 	"github.com/cloudwego/hertz/pkg/app/server"
+
+	"github.com/hertz-contrib/logger/accesslog"
 )
 
 func Init() {
-	middleware.InitJwt()
-	config.InitRedis()
-	config.InitEmailClient()
-	config.InitKubernetesClient()
-	config.InitDB()
+	wg := sync.WaitGroup{}
+	wg.Add(5)
+	go func() {
+		config.InitDB()
+		wg.Done()
+	}()
+	go func() {
+		middleware.InitJwt()
+		wg.Done()
+	}()
+	go func() {
+		config.InitRedis()
+		wg.Done()
+	}()
+	go func() {
+		config.InitEmailClient()
+		wg.Done()
+	}()
+	go func() {
+		config.InitKubernetesClient()
+		wg.Done()
+	}()
+	wg.Wait()
+}
+
+// 启动定时任务
+func StartTimer() {
+	timerService := task.NewTimerService(context.Background())
+	timerService.Start()
 }
 
 func main() {
@@ -24,6 +51,7 @@ func main() {
 	h := server.Default()
 	h.Use(accesslog.New())
 	register(h)
+	go StartTimer()
 
 	h.Spin()
 }

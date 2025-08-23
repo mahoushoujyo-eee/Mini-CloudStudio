@@ -9,7 +9,8 @@ require (
 	github.com/go-redis/redis/v8 v8.11.5
 	github.com/google/uuid v1.6.0
 	github.com/hertz-contrib/jwt v1.0.4
-	github.com/wneessen/go-mail v0.6.2
+	github.com/hertz-contrib/logger/accesslog v0.0.0-20241107070745-e4ce8c54dd97
+	github.com/robfig/cron/v3 v3.0.1
 	golang.org/x/crypto v0.36.0
 	gorm.io/driver/mysql v1.6.0
 	gorm.io/gorm v1.30.1
@@ -43,7 +44,6 @@ require (
 	github.com/golang/protobuf v1.5.0 // indirect
 	github.com/google/gnostic-models v0.6.9 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
-	github.com/hertz-contrib/logger/accesslog v0.0.0-20241107070745-e4ce8c54dd97 // indirect
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/jinzhu/now v1.1.5 // indirect
 	github.com/josharian/intern v1.0.0 // indirect

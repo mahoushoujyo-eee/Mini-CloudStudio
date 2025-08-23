@@ -63,7 +63,7 @@ func (s *KubernetesUtil) GetPodList(param *model.KubernetesParam) (*corev1.PodLi
 		return nil, err
 	}
 
-	log.Printf("Found %d pods in '%s' namespace:\n", len(pods.Items), param.Namespace)
+	log.Printf("Found %d pods in '%s' namespace\n", len(pods.Items), param.Namespace)
 
 	return pods, nil
 }
