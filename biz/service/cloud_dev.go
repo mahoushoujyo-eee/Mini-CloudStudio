@@ -312,3 +312,27 @@ func (s *AppService) GetLogOfApp(appParam *model.AppParam) (string, error) {
 
 	return logs, nil
 }
+
+func (s *AppService) GetUsageOfApp() (int64, error) {
+	userId, ok := s.c.Get("user_id")
+	if !ok {
+		return 0, errors.New("没有找到用户ID")
+	}
+
+	var totalSeconds int64
+
+	// 直接在数据库层面计算总和
+	err := config.DB.WithContext(s.ctx).
+		Model(&model.PodUsageRecord{}).
+		Where("user_id = ?", userId).
+		Select("COALESCE(SUM(total_seconds), 0)").
+		Scan(&totalSeconds).Error
+
+	if err != nil {
+		return 0, err
+	}
+
+	totalMinutes := totalSeconds / 60
+
+	return totalMinutes, nil
+}

@@ -26,6 +26,7 @@ func RegisterCloudDev(r *route.RouterGroup) {
 		commonRouter.GET("/details/list", handler.AppGetPodStateList)
 		commonRouter.POST("/log", handler.AppGetLog)
 		commonRouter.POST("/update")
+		commonRouter.POST("/usage", handler.AppGetUsage)
 	}
 
 	adminRouter := r.Group("/admin")

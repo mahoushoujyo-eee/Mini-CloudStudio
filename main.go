@@ -7,9 +7,14 @@ import (
 	"learn/biz/config"
 	"learn/biz/middleware"
 	"learn/biz/task"
+	"os"
+	"os/signal"
 	"sync"
+	"syscall"
+	"time"
 
 	"github.com/cloudwego/hertz/pkg/app/server"
+	"github.com/cloudwego/hertz/pkg/common/hlog"
 
 	"github.com/hertz-contrib/logger/accesslog"
 )
@@ -40,18 +45,51 @@ func Init() {
 	wg.Wait()
 }
 
-// 启动定时任务
-func StartTimer() {
-	timerService := task.NewTimerService(context.Background())
-	timerService.Start()
-}
-
 func main() {
 	Init()
+
+	// 创建带取消的context
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// 启动定时任务
+	timerService := task.NewTimerService(ctx)
+	timerService.Start()
+
+	// 创建HTTP服务器
 	h := server.Default()
 	h.Use(accesslog.New())
 	register(h)
-	go StartTimer()
 
-	h.Spin()
+	// 创建优雅关闭的信号处理
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+
+	// 在goroutine中启动HTTP服务器
+	go func() {
+		hlog.Info("HTTP服务器启动中...")
+		h.Spin()
+	}()
+
+	// 等待关闭信号
+	<-quit
+	hlog.Info("收到关闭信号，开始优雅关闭...")
+
+	// 取消context，通知所有服务停止
+	cancel()
+
+	// 停止定时任务
+	hlog.Info("正在停止定时任务...")
+	timerService.Stop()
+
+	// 停止HTTP服务器
+	hlog.Info("正在停止HTTP服务器...")
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer shutdownCancel()
+
+	if err := h.Shutdown(shutdownCtx); err != nil {
+		hlog.Errorf("HTTP服务器关闭失败: %v", err)
+	}
+
+	hlog.Info("应用程序已安全关闭")
 }

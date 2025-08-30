@@ -29,6 +29,7 @@ _testmain.go
 *.sublime-workspace
 !.gitkeep
 .DS_Store
+/.codebuddy
 /.idea
 /.vscode
 /output

@@ -228,3 +228,20 @@ func AppGetLog(ctx context.Context, c *app.RequestContext) {
 		Data:       logs,
 	})
 }
+
+func AppGetUsage(ctx context.Context, c *app.RequestContext) {
+	usage, err := service.NewAppService(ctx, c).GetUsageOfApp()
+	if err != nil {
+		c.JSON(consts.StatusOK, model.Response{
+			StatusCode: consts.StatusInternalServerError,
+			Message:    err.Error(),
+		})
+		return
+	}
+
+	c.JSON(consts.StatusOK, model.Response{
+		StatusCode: consts.StatusOK,
+		Message:    "查询成功",
+		Data:       usage,
+	})
+}
