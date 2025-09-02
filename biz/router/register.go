@@ -19,4 +19,9 @@ func GeneratedRegister(r *server.Hertz) {
 	{
 		RegisterCloudDev(cloudDevRouter)
 	}
+
+	counterRouter := r.Group("/counter")
+	{
+		RegisterCounter(counterRouter)
+	}
 }

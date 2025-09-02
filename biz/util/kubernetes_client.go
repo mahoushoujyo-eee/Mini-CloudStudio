@@ -108,7 +108,9 @@ func (s *KubernetesUtil) CreateDeployment(kbParam *model.KubernetesParam, appPar
 							{Name: "SUDO_PASSWORD", Value: appParam.PodPassword},
 							{Name: "PWA_APPNAME", Value: "code-server"},
 							{Name: "HTTP_PROXY", Value: "http://223.2.19.172:3128"},
+							{Name: "http_proxy", Value: "http://223.2.19.172:3128"},
 							{Name: "HTTPS_PROXY", Value: "http://223.2.19.172:3128"},
+							{Name: "https_proxy", Value: "http://223.2.19.172:3128"},
 						},
 						Ports: []corev1.ContainerPort{{
 							ContainerPort: 8443,
@@ -202,8 +204,6 @@ func (s *KubernetesUtil) CreatePod(kbParam *model.KubernetesParam, appParam *mod
 					{Name: "PASSWORD", Value: appParam.PodPassword},
 					{Name: "SUDO_PASSWORD", Value: appParam.PodPassword},
 					{Name: "PWA_APPNAME", Value: "code-server"},
-					{Name: "HTTP_PROXY", Value: "http://223.2.19.172:3128"},
-					{Name: "HTTPS_PROXY", Value: "http://223.2.19.172:3128"},
 				},
 				Ports: []corev1.ContainerPort{{
 					ContainerPort: 8443,
