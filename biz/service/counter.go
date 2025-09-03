@@ -6,17 +6,14 @@ import (
 	"learn/biz/config"
 	"learn/biz/model"
 	"strconv"
-
-	"github.com/cloudwego/hertz/pkg/app"
 )
 
 type CounterService struct {
 	ctx context.Context
-	c   *app.RequestContext
 }
 
-func NewCounterService(ctx context.Context, c *app.RequestContext) *CounterService {
-	return &CounterService{ctx, c}
+func NewCounterService(ctx context.Context) *CounterService {
+	return &CounterService{ctx}
 }
 
 func (service *CounterService) CountTime(podUsage model.PodUsageRecord) error {

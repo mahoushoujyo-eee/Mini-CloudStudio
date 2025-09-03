@@ -34,6 +34,10 @@ func Init() {
 		config.InitKubernetesClient()
 		wg.Done()
 	}()
+	//go func() {
+	//	task.InitKafka()
+	//	wg.Done()
+	//}()
 	wg.Wait()
 }
 
