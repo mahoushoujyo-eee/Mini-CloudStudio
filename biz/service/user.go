@@ -3,12 +3,14 @@ package service
 import (
 	"context"
 	"errors"
-
-	"github.com/cloudwego/hertz/pkg/app"
+	"log"
+	"time"
 
 	"learn/biz/config"
 	"learn/biz/model"
 	"learn/biz/util"
+
+	"github.com/cloudwego/hertz/pkg/app"
 )
 
 type UserService struct {
@@ -38,7 +40,8 @@ func (s *UserService) Register(userParam model.UserParam) (uint, error) {
 	}
 
 	code, err := config.RedisClient.Get(s.ctx, userParam.Email+":register").Result()
-	if err == nil && code != "" {
+	if err != nil || code == "" {
+		log.Printf("获取验证码失败：%v", err)
 		return 0, errors.New("确认验证码失败，请稍后再试")
 	}
 
@@ -76,7 +79,7 @@ func (s *UserService) SendEmail(emailParam model.EmailParam) error {
 		return err
 	}
 
-	err = config.RedisClient.Set(s.ctx, emailParam.Receiver+":"+emailParam.Type, code, 5*60).Err()
+	err = config.RedisClient.Set(s.ctx, emailParam.Receiver+":"+emailParam.Type, code, 5*time.Minute).Err()
 	if err != nil {
 		return err
 	}

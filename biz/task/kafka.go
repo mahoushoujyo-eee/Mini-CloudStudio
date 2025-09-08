@@ -30,8 +30,8 @@ func InitKafka() {
 	log.Print("初始化Kafka配置....")
 
 	// 从环境变量获取配置
-	brokers := []string{getEnvOrDefault("KAFKA_BROKERS", "localhost:9092")}
-	topic := getEnvOrDefault("KAFKA_TOPIC", "pod-heartbeat")
+	brokers := []string{getEnvOrDefault("KAFKA_BROKERS", "kafka.minics.svc.cluster.local:9092")}
+	topic := getEnvOrDefault("KAFKA_TOPIC", "timecounter")
 	groupID := getEnvOrDefault("KAFKA_GROUP_ID", "pod-heartbeat-consumer")
 
 	GlobalKafkaConfig = &KafkaConfig{
@@ -102,7 +102,7 @@ func (h *HeartbeatHandler) ConsumeClaim(sess sarama.ConsumerGroupSession, claim 
 		}
 
 		if err := service.NewCounterService(context.TODO()).CountTime(record); err != nil {
-			log.Printf("计数失败: %v", err)
+			log.Printf("计时失败: %v", err)
 		}
 
 		log.Printf("收到心跳 | pod=%s namespace=%s user=%d lastUpdate=%s",

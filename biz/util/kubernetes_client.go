@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"strconv"
+	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -96,42 +98,71 @@ func (s *KubernetesUtil) CreateDeployment(kbParam *model.KubernetesParam, appPar
 					},
 				},
 				Spec: corev1.PodSpec{
-					Containers: []corev1.Container{{
-						Name:            "code-server",
-						Image:           "docker.1ms.run/linuxserver/code-server:4.103.0",
-						ImagePullPolicy: corev1.PullNever,
-						Env: []corev1.EnvVar{
-							{Name: "PUID", Value: "1000"},
-							{Name: "PGID", Value: "1000"},
-							{Name: "TZ", Value: "Etc/UTC"},
-							{Name: "PASSWORD", Value: appParam.PodPassword},
-							{Name: "SUDO_PASSWORD", Value: appParam.PodPassword},
-							{Name: "PWA_APPNAME", Value: "code-server"},
-							{Name: "HTTP_PROXY", Value: "http://223.2.19.172:3128"},
-							{Name: "http_proxy", Value: "http://223.2.19.172:3128"},
-							{Name: "HTTPS_PROXY", Value: "http://223.2.19.172:3128"},
-							{Name: "https_proxy", Value: "http://223.2.19.172:3128"},
-						},
-						Ports: []corev1.ContainerPort{{
-							ContainerPort: 8443,
-							Protocol:      corev1.ProtocolTCP,
-							Name:          "https",
-						}},
-						VolumeMounts: []corev1.VolumeMount{{
-							Name:      "data",
-							MountPath: "/config",
-						}},
-						Resources: corev1.ResourceRequirements{
-							Requests: corev1.ResourceList{
-								corev1.ResourceCPU:    resource.MustParse(appParam.Cpu),
-								corev1.ResourceMemory: resource.MustParse(appParam.Memory),
+					Containers: []corev1.Container{
+						{
+							Name:            "code-server",
+							Image:           "docker.1ms.run/linuxserver/code-server:4.103.0",
+							ImagePullPolicy: corev1.PullNever,
+							Env: []corev1.EnvVar{
+								{Name: "PUID", Value: "1000"},
+								{Name: "PGID", Value: "1000"},
+								{Name: "TZ", Value: "Etc/UTC"},
+								{Name: "PASSWORD", Value: appParam.PodPassword},
+								{Name: "SUDO_PASSWORD", Value: appParam.PodPassword},
+								{Name: "PWA_APPNAME", Value: "code-server"},
+								{Name: "HTTP_PROXY", Value: "http://223.2.19.172:3128"},
+								{Name: "http_proxy", Value: "http://223.2.19.172:3128"},
+								{Name: "HTTPS_PROXY", Value: "http://223.2.19.172:3128"},
+								{Name: "https_proxy", Value: "http://223.2.19.172:3128"},
 							},
-							Limits: corev1.ResourceList{
-								corev1.ResourceCPU:    resource.MustParse(appParam.Cpu),
-								corev1.ResourceMemory: resource.MustParse(appParam.Memory),
+							Ports: []corev1.ContainerPort{{
+								ContainerPort: 8443,
+								Protocol:      corev1.ProtocolTCP,
+								Name:          "https",
+							}},
+							VolumeMounts: []corev1.VolumeMount{{
+								Name:      "data",
+								MountPath: "/config",
+							}},
+							Resources: corev1.ResourceRequirements{
+								Requests: corev1.ResourceList{
+									corev1.ResourceCPU:    resource.MustParse(appParam.Cpu),
+									corev1.ResourceMemory: resource.MustParse(appParam.Memory),
+								},
+								Limits: corev1.ResourceList{
+									corev1.ResourceCPU:    resource.MustParse(appParam.Cpu),
+									corev1.ResourceMemory: resource.MustParse(appParam.Memory),
+								},
 							},
 						},
-					}},
+						{
+							Name:            "heartbeater",
+							Image:           "223.2.19.172:30002/minics/heartbeater:1.0.0",
+							ImagePullPolicy: corev1.PullIfNotPresent,
+							Env: []corev1.EnvVar{
+								{
+									Name: "POD_NAME",
+									ValueFrom: &corev1.EnvVarSource{
+										FieldRef: &corev1.ObjectFieldSelector{
+											FieldPath: "metadata.name",
+										},
+									},
+								},
+								{
+									Name: "NAMESPACE",
+									ValueFrom: &corev1.EnvVarSource{
+										FieldRef: &corev1.ObjectFieldSelector{
+											FieldPath: "metadata.namespace",
+										},
+									},
+								},
+								{Name: "USER_ID", Value: strconv.Itoa(int(appParam.UserId))},
+								{Name: "KUBERNETES_POD_START_TIME", Value: time.Now().UTC().Format("2006-01-02T15:04:05Z")},
+								{Name: "KAFKA_TOPIC", Value: "timecounter"},
+								{Name: "KAFKA_BROKERS", Value: "kafka.minics.svc.cluster.local:9092"},
+								{Name: "DEPLOY_NAME", Value: kbParam.Deployment},
+							},
+						}},
 					Volumes: []corev1.Volume{{
 						Name: "data",
 						VolumeSource: corev1.VolumeSource{
@@ -194,37 +225,68 @@ func (s *KubernetesUtil) CreatePod(kbParam *model.KubernetesParam, appParam *mod
 			},
 		},
 		Spec: corev1.PodSpec{
-			Containers: []corev1.Container{{
-				Name:  "code-server",
-				Image: "docker.1ms.run/linuxserver/code-server:4.103.0",
-				Env: []corev1.EnvVar{
-					{Name: "PUID", Value: "1000"},
-					{Name: "PGID", Value: "1000"},
-					{Name: "TZ", Value: "Etc/UTC"},
-					{Name: "PASSWORD", Value: appParam.PodPassword},
-					{Name: "SUDO_PASSWORD", Value: appParam.PodPassword},
-					{Name: "PWA_APPNAME", Value: "code-server"},
-				},
-				Ports: []corev1.ContainerPort{{
-					ContainerPort: 8443,
-					Protocol:      corev1.ProtocolTCP,
-					Name:          "https",
-				}},
-				VolumeMounts: []corev1.VolumeMount{{
-					Name:      "data",
-					MountPath: "/config",
-				}},
-				Resources: corev1.ResourceRequirements{
-					Requests: corev1.ResourceList{
-						corev1.ResourceCPU:    resource.MustParse(appParam.Cpu),
-						corev1.ResourceMemory: resource.MustParse(appParam.Memory),
+			Containers: []corev1.Container{
+				// 1. 原来的 code-server
+				{
+					Name:  "code-server",
+					Image: "docker.1ms.run/linuxserver/code-server:4.103.0",
+					Env: []corev1.EnvVar{
+						{Name: "PUID", Value: "1000"},
+						{Name: "PGID", Value: "1000"},
+						{Name: "TZ", Value: "Etc/UTC"},
+						{Name: "PASSWORD", Value: appParam.PodPassword},
+						{Name: "SUDO_PASSWORD", Value: appParam.PodPassword},
+						{Name: "PWA_APPNAME", Value: "code-server"},
 					},
-					Limits: corev1.ResourceList{
-						corev1.ResourceCPU:    resource.MustParse(appParam.Cpu),
-						corev1.ResourceMemory: resource.MustParse(appParam.Memory),
+					Ports: []corev1.ContainerPort{{
+						ContainerPort: 8443,
+						Protocol:      corev1.ProtocolTCP,
+						Name:          "https",
+					}},
+					VolumeMounts: []corev1.VolumeMount{{
+						Name:      "data",
+						MountPath: "/config",
+					}},
+					Resources: corev1.ResourceRequirements{
+						Requests: corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse(appParam.Cpu),
+							corev1.ResourceMemory: resource.MustParse(appParam.Memory),
+						},
+						Limits: corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse(appParam.Cpu),
+							corev1.ResourceMemory: resource.MustParse(appParam.Memory),
+						},
 					},
 				},
-			}},
+				// 2. 新增的 heartbeater
+				{
+					Name:            "heartbeater",
+					Image:           "223.2.19.172:30002/minics/heartbeater:1.0.0",
+					ImagePullPolicy: corev1.PullIfNotPresent,
+					Env: []corev1.EnvVar{
+						{
+							Name: "POD_NAME",
+							ValueFrom: &corev1.EnvVarSource{
+								FieldRef: &corev1.ObjectFieldSelector{
+									FieldPath: "metadata.name",
+								},
+							},
+						},
+						{
+							Name: "NAMESPACE",
+							ValueFrom: &corev1.EnvVarSource{
+								FieldRef: &corev1.ObjectFieldSelector{
+									FieldPath: "metadata.namespace",
+								},
+							},
+						},
+						{Name: "USER_ID", Value: "33"},
+						{Name: "KUBERNETES_POD_START_TIME", Value: time.Now().UTC().Format("2006-01-02T15:04:05Z")},
+						{Name: "KAFKA_TOPIC", Value: "timecounter"},
+						{Name: "KAFKA_BROKERS", Value: "kafka.minics.svc.cluster.local:9092"},
+					},
+				},
+			},
 			Volumes: []corev1.Volume{{
 				Name: "data",
 				VolumeSource: corev1.VolumeSource{

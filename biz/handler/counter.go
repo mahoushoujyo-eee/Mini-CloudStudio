@@ -20,7 +20,7 @@ func CountTime(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	err = service.NewCounterService(ctx, c).CountTime(podUsage)
+	err = service.NewCounterService(ctx).CountTime(podUsage)
 	if err != nil {
 		c.JSON(200, model.Response{
 			StatusCode: consts.StatusInternalServerError,

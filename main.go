@@ -5,6 +5,7 @@ package main
 import (
 	"learn/biz/config"
 	"learn/biz/middleware"
+	"learn/biz/task"
 	"sync"
 
 	"github.com/cloudwego/hertz/pkg/app/server"
@@ -24,6 +25,7 @@ func Init() {
 	}()
 	go func() {
 		config.InitRedis()
+		task.InitKafka()
 		wg.Done()
 	}()
 	go func() {
@@ -34,10 +36,6 @@ func Init() {
 		config.InitKubernetesClient()
 		wg.Done()
 	}()
-	//go func() {
-	//	task.InitKafka()
-	//	wg.Done()
-	//}()
 	wg.Wait()
 }
 
